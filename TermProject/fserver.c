@@ -18,63 +18,49 @@ void toUpper(char* in, char* out);
 int readLine(int fd, char* str);
 
 //file server program
-int main(){
+int main(int argc, char* argv[]){
 	int sfd, cfd, port, clientlen;
 	FILE *fp;
 	char inmsg[MAXLINE], outmsg[MAXLINE];
-	struct sockaddr_un serverAddr, clientAddr;
+	struct sockaddr_in serverAddr, clientAddr;
+	struct hostent *hp;
+	char *haddrp;
 
 	signal(SIGCHLD, SIG_IGN);
-	clientlen = sizeof(clientAddr);
 
-	sfd = socket(AF_UNIX, SOCK_STREAM, DEFAULT_PROTOCOL);
-	serverAddr.sun_family = AF_UNIX;
-	strcpy(serverAddr.sun_path, "convert");
-	unlink("convert");
-	bind(sfd, (struct sockaddr *) &serverAddr, sizeof(serverAddr));
+	if(argc != 2){
+		fprintf(stderr, "사용법 : %s <port>\n", argv[0]);
+		exit(0);
+	}
+
+	port = atoi(argv[1]);
+	sfd = socket(AF_INET, SOCK_STREAM, DEFAULT_PROTOCOL);
+
+	bzero((char *) &serverAddr, sizeof(serverAddr));
+	serverAddr.sin_family = AF_INET;
+	serverAddr.sin_addr = htonl(INADDR_ANY);
+	serverAddr.sin_port = htons((unsigned short)port);
+	bind(sfd, (struct sockAddr *) &serverAddr, sizeof(serverAddr));
 	listen(sfd, 5);
 
 	while(1){
-		cfd = accept(sfd, (struct sockaddr *)&clientAddr, &clientlen);
-		if(fork() == 0){
-			readLine(cfd, inmsg);
-			toUpper(inmsg, outmsg);
-			write(cfd, outmsg, strlen(outmsg) + 1);
+		clientlen = sizeof(clientAddr);
+		cfd = accept(sfd, (struct sockAddr *)&clientAddr, &clientlen);
+		haddrp = inet_ntoa(clientAddr.sin_addr);
+		printf("서버 : %s(%d)에 연결됨\n", haddrp, clientAddr.sin_port);
+
+		if( fork() == 0){
+			readLine(cfd, inmsg);	//소켓에서 파일 이름을 읽는다.
+			fp = fopen(inmsg, "r");
+			if(fp == '\0'){
+				write(cfd, "해당 파일 없음", 10);
+			}else{	//파일에서 한 줄 씩 읽어 소켓을 통해 보낸다.
+				while(fgets(outmsg, MAXLINE, fp)!= '\0')
+					write(cfd, outmsg, strlen(outmsg) + 1);
+			}
 			close(cfd);
 			exit(0);
 		}else close(cfd);
+
 	}
 }
-
-void toUpper(char* in, char* out){
-	int i;
-	for(i = 0; i< strlen(in); i++)
-		if(islower(in[i]))
-			out[i] = toupper(in[i]);
-		else out[i] = in[i];
-	out[i] = '\0';
-}
-
-
-
-int readLine(int fd, char* str){
-	int n;
-	do{
-		n = read(fd, str, 1);
-	}while(n > 0 && *str++ != '\0');
-		return (n > 0);
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
