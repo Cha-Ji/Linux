@@ -19,7 +19,8 @@ int readLine(int fd, char* str);
 
 //file server program
 int main(){
-	int sfd, cfd, clientlen;
+	int sfd, cfd, port, clientlen;
+	FILE *fp;
 	char inmsg[MAXLINE], outmsg[MAXLINE];
 	struct sockaddr_un serverAddr, clientAddr;
 
